@@ -1,8 +1,8 @@
 import stateManager from "./state.js"
-import commands, { COMMANDS } from './commands.js'
-import path from 'path'
+import commands from './commands.js'
 import os from 'os'
 import { ERRORS } from "./errors.js"
+import { COMMANDS } from "./consts.js"
 export function fileManager() {
 
   function sayHi() {

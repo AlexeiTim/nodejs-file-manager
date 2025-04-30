@@ -10,6 +10,11 @@ import { zlibService } from "./zlibService.js"
 import { hashService } from "./hashService.js"
 
 async function decompress(sourcePath, destPath) {
+  if (!sourcePath || !destPath) {
+    console.log(ERRORS.OPERATION_FAILED)
+    return
+  }
+
   const joinedSourcePath = path.join(process.cwd(), sourcePath)
   const joinedDestPath = path.join(process.cwd(), destPath)
   try {
@@ -29,7 +34,7 @@ async function compress(sourcePath, destPath) {
   const joinedDestPath = path.join(process.cwd(), destPath)
   try {
     await fs.promises.access(joinedSourcePath)
-    await zlibService.decompress(joinedSourcePath, joinedDestPath)
+    await zlibService.compress(joinedSourcePath, joinedDestPath)
   } catch(e) {
     console.log(ERRORS.OPERATION_FAILED)
   }
