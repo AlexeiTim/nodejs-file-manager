@@ -4,8 +4,6 @@ import { ERRORS } from "./errors.js"
 import fs from 'fs'
 import { table } from "console"
 import { pipeline } from "stream/promises"
-import crypto from 'crypto'
-import zlib from 'zlib'
 import { COMMANDS, MIN_DIR_PATH, OS_COMMANDS } from "./consts.js"
 import { checkFile, checkTargetExist, getEntryType, isDirectory } from "./utils.js"
 import { zlibService } from "./zlibService.js"
@@ -133,8 +131,8 @@ async function add(fileName) {
   }
   const actualPath = path.join(process.cwd(), fileName)
 
-  const isFileExist = await checkTargetExist(actualPath)
-  if (isFileExist) {
+  const isTargetExists = await checkTargetExist(actualPath)
+  if (isTargetExists) {
     throw new Error(ERRORS.OPERATION_FAILED)
   }
   await fs.promises.writeFile(actualPath, '')
@@ -147,7 +145,6 @@ async function rn(targetPath, newFileName) {
   } catch(e) {
     console.log(ERRORS.OPERATION_FAILED)
   }
-  
 }
 
 async function cp(fileName, newPath) {
