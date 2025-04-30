@@ -81,7 +81,15 @@ async function hash(targetPath) {
 
 const OS_COMMANDS = {
   '--EOL': () => JSON.stringify(os.EOL),
-  '--cpus': () => os.cpus(),
+  '--cpus': () => {
+    const cpus = os.cpus()
+    let result = ''
+    result += `Amount: ${cpus.length}\n`
+    cpus.forEach((cp, idx) => {
+      result += `num: ${idx + 1}, model: ${cp.model}, clock rate: ${(cp.speed / 1000).toFixed(2)} GHz\n`
+    })
+    return result
+  },
   '--homedir': () => os.homedir(),
   '--username': () => os.userInfo().username,
   '--architecture': () => os.arch(),
@@ -236,12 +244,6 @@ async function cp(fileName, newPath) {
   const oldFilePath = path.join(process.cwd(), fileName)
   const targetMovePath = path.join(process.cwd(), newPath)
 
-  const isFileExists = await checkFile(oldFilePath)
-  if (!isFileExists) {
-    console.log(ERRORS.OPERATION_FAILED)
-    return
-  }
-
   const isDirTarget = await isDirectory(targetMovePath)
   if (!isDirTarget) {
     console.log(ERRORS.OPERATION_FAILED)
@@ -249,9 +251,10 @@ async function cp(fileName, newPath) {
   }
 
   try {
+    await fs.promises.access(oldFilePath);
     const readStream = fs.createReadStream(oldFilePath)
-    const writeFilePath = path.join(targetMovePath, fileName)
-    const writeStream = fs.createWriteStream(writeFilePath)
+    const writePath = path.join(targetMovePath, fileName)
+    const writeStream = fs.createWriteStream(writePath)
     await pipeline(readStream, writeStream)
   } catch(e) {
     console.log(ERRORS.OPERATION_FAILED)
@@ -262,12 +265,6 @@ async function mv(fileName, newPath) {
   const oldFilePath = path.join(process.cwd(), fileName)
   const targetMovePath = path.join(process.cwd(), newPath)
 
-  const isFileExists = await checkFile(oldFilePath)
-  if (!isFileExists) {
-    console.log(ERRORS.OPERATION_FAILED)
-    return
-  }
-
   const isDirTarget = await isDirectory(targetMovePath)
   if (!isDirTarget) {
     console.log(ERRORS.OPERATION_FAILED)
@@ -275,6 +272,7 @@ async function mv(fileName, newPath) {
   }
 
   try {
+    await fs.promises.access(oldFilePath);
     const readStream = fs.createReadStream(oldFilePath)
     const writeFilePath = path.join(targetMovePath, fileName)
     const writeStream = fs.createWriteStream(writeFilePath)
