@@ -2,9 +2,11 @@ import stateManager from "./state.js"
 import path from 'path'
 import os from 'os'
 import { ERRORS } from "./errors.js"
-import fs from 'fs'
+import fs, { read } from 'fs'
 import { table } from "console"
 import { pipeline } from "stream/promises"
+import crypto from 'crypto'
+import zlib from 'zlib'
 
 export const COMMANDS = {
   EXIT: '.exit',
@@ -24,20 +26,75 @@ export const COMMANDS = {
   DECOMPRESS: 'decompress'
 }
 
-function decompress() {
-  console.log('command decompress')
+async function decompress(sourcePath, destPath) {
+  const joinedSourcePath = path.join(process.cwd(), sourcePath)
+  const joinedDestPath = path.join(process.cwd(), destPath)
+  try {
+    await fs.promises.access(joinedSourcePath)
+    const readStream = fs.createReadStream(joinedSourcePath)
+    const writeStream = fs.createWriteStream(joinedDestPath)
+    const decompress = zlib.createBrotliDecompress()
+    await pipeline(readStream, decompress, writeStream)
+  } catch(e) {
+    console.log(ERRORS.OPERATION_FAILED)
+  }
 }
 
-function compress() {
-  console.log('command compress')
+async function compress(sourcePath, destPath) {
+  if (!sourcePath || !destPath) {
+    console.log(ERRORS.OPERATION_FAILED)
+    return
+  }
+  const joinedSourcePath = path.join(process.cwd(), sourcePath)
+  const joinedDestPath = path.join(process.cwd(), destPath)
+  try {
+    await fs.promises.access(joinedSourcePath)
+    const readStream = fs.createReadStream(joinedSourcePath)
+    const writeStream = fs.createWriteStream(joinedDestPath)
+    const compressor = zlib.createBrotliCompress()
+    await pipeline(readStream, compressor, writeStream)
+  } catch(e) {
+    console.log(ERRORS.OPERATION_FAILED)
+  }
 }
 
-function hash() {
-  console.log('command hash')
+async function hash(targetPath) {
+  const joinedPath = path.join(process.cwd(), targetPath)
+  try {
+    await fs.promises.access(joinedPath)
+    const newHash = crypto.createHash('SHA256')
+    const readStream = fs.createReadStream(joinedPath)
+    readStream.on('data', (chunk) => {
+      newHash.update(chunk)
+    })
+    readStream.on('end', () => {
+      const result = newHash.digest('hex')
+      console.log(result)
+    })
+    readStream.on('error', () => {
+      console.log(ERRORS.OPERATION_FAILED)
+    })
+  } catch(e) {
+    console.log(ERRORS.OPERATION_FAILED)
+  }
 }
 
-function customOs() {
-  console.log('command customOs')
+const OS_COMMANDS = {
+  '--EOL': () => JSON.stringify(os.EOL),
+  '--cpus': () => os.cpus(),
+  '--homedir': () => os.homedir(),
+  '--username': () => os.userInfo().username,
+  '--architecture': () => os.arch(),
+}
+
+async function customOs(arg) {
+  const command = OS_COMMANDS[arg]
+  if (!command) {
+    console.log(ERRORS.OPERATION_FAILED)
+    return
+  }
+  const result = command()
+  console.log(result)
 }
 
 async function rm(pathToFile) {
@@ -175,8 +232,30 @@ async function rn(targetPath, newFileName) {
   
 }
 
-function cp() {
-  console.log('cmd cp')
+async function cp(fileName, newPath) {
+  const oldFilePath = path.join(process.cwd(), fileName)
+  const targetMovePath = path.join(process.cwd(), newPath)
+
+  const isFileExists = await checkFile(oldFilePath)
+  if (!isFileExists) {
+    console.log(ERRORS.OPERATION_FAILED)
+    return
+  }
+
+  const isDirTarget = await isDirectory(targetMovePath)
+  if (!isDirTarget) {
+    console.log(ERRORS.OPERATION_FAILED)
+    return
+  }
+
+  try {
+    const readStream = fs.createReadStream(oldFilePath)
+    const writeFilePath = path.join(targetMovePath, fileName)
+    const writeStream = fs.createWriteStream(writeFilePath)
+    await pipeline(readStream, writeStream)
+  } catch(e) {
+    console.log(ERRORS.OPERATION_FAILED)
+  }
 }
 
 async function mv(fileName, newPath) {
