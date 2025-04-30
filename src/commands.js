@@ -1,40 +1,22 @@
 import stateManager from "./state.js"
 import path from 'path'
-import os from 'os'
 import { ERRORS } from "./errors.js"
-import fs, { read } from 'fs'
+import fs from 'fs'
 import { table } from "console"
 import { pipeline } from "stream/promises"
 import crypto from 'crypto'
 import zlib from 'zlib'
-
-export const COMMANDS = {
-  EXIT: '.exit',
-  UP: 'up',
-  LS: 'ls',
-  CD: 'cd',
-  CAT: 'cat',
-  ADD: 'add',
-  MRDIR: 'mkdir',
-  RN: 'rn',
-  CP: 'cp',
-  MV: 'mv',
-  RM: 'rm',
-  OS: 'os',
-  HASH: 'hash',
-  COMPRESS: 'compress',
-  DECOMPRESS: 'decompress'
-}
+import { COMMANDS, MIN_DIR_PATH, OS_COMMANDS } from "./consts.js"
+import { checkFile, checkTargetExist, getEntryType, isDirectory } from "./utils.js"
+import { zlibService } from "./zlibService.js"
+import { hashService } from "./hashService.js"
 
 async function decompress(sourcePath, destPath) {
   const joinedSourcePath = path.join(process.cwd(), sourcePath)
   const joinedDestPath = path.join(process.cwd(), destPath)
   try {
     await fs.promises.access(joinedSourcePath)
-    const readStream = fs.createReadStream(joinedSourcePath)
-    const writeStream = fs.createWriteStream(joinedDestPath)
-    const decompress = zlib.createBrotliDecompress()
-    await pipeline(readStream, decompress, writeStream)
+    await zlibService.decompress(joinedSourcePath, joinedDestPath)
   } catch(e) {
     console.log(ERRORS.OPERATION_FAILED)
   }
@@ -49,10 +31,7 @@ async function compress(sourcePath, destPath) {
   const joinedDestPath = path.join(process.cwd(), destPath)
   try {
     await fs.promises.access(joinedSourcePath)
-    const readStream = fs.createReadStream(joinedSourcePath)
-    const writeStream = fs.createWriteStream(joinedDestPath)
-    const compressor = zlib.createBrotliCompress()
-    await pipeline(readStream, compressor, writeStream)
+    await zlibService.decompress(joinedSourcePath, joinedDestPath)
   } catch(e) {
     console.log(ERRORS.OPERATION_FAILED)
   }
@@ -62,37 +41,10 @@ async function hash(targetPath) {
   const joinedPath = path.join(process.cwd(), targetPath)
   try {
     await fs.promises.access(joinedPath)
-    const newHash = crypto.createHash('SHA256')
-    const readStream = fs.createReadStream(joinedPath)
-    readStream.on('data', (chunk) => {
-      newHash.update(chunk)
-    })
-    readStream.on('end', () => {
-      const result = newHash.digest('hex')
-      console.log(result)
-    })
-    readStream.on('error', () => {
-      console.log(ERRORS.OPERATION_FAILED)
-    })
+    hashService.showHashFileByPath(joinedPath)
   } catch(e) {
     console.log(ERRORS.OPERATION_FAILED)
   }
-}
-
-const OS_COMMANDS = {
-  '--EOL': () => JSON.stringify(os.EOL),
-  '--cpus': () => {
-    const cpus = os.cpus()
-    let result = ''
-    result += `Amount: ${cpus.length}\n`
-    cpus.forEach((cp, idx) => {
-      result += `num: ${idx + 1}, model: ${cp.model}, clock rate: ${(cp.speed / 1000).toFixed(2)} GHz\n`
-    })
-    return result
-  },
-  '--homedir': () => os.homedir(),
-  '--username': () => os.userInfo().username,
-  '--architecture': () => os.arch(),
 }
 
 async function customOs(arg) {
@@ -119,39 +71,10 @@ async function rm(pathToFile) {
   }
 }
 
-const MIN_DIR_PATH = os.homedir()
-
 function exit() {
   console.log(`\nThank you for using File Manager, ${stateManager.getUsername()}, goodbye!`)
   stateManager.setUsername(null)
   process.exit()
-}
-
-async function isDirectory(targetPath) {
-  try {
-    const stat = await fs.promises.stat(targetPath)
-    return stat.isDirectory()
-  } catch(e) {
-    return false
-  }
-}
-
-async function checkFile(targetPath) {
-  try {
-    const stat = await fs.promises.stat(targetPath)
-    return stat.isFile()
-  } catch(e) {
-    return false
-  }
-}
-
-async function checkTargetExist(targetPath) {
-  try {
-    await fs.promises.access(targetPath)
-    return true
-  } catch(e) {
-    return false
-  }
 }
 
 async function up() {
@@ -172,19 +95,6 @@ async function cd(targetPath) {
   }
 
   process.chdir(newPath)
-}
-
-function getEntryType(entry) {
-  let type = ''
-  if (entry.isFile()) type = 'File';
-  else if (entry.isDirectory()) type = 'Directory';
-  else if (entry.isSymbolicLink()) type = 'Symbolic link';
-  else if (entry.isFIFO()) type = 'FIFO';
-  else if (entry.isSocket()) type = 'Socket';
-  else if (entry.isCharacterDevice()) type = 'Character device';
-  else if (entry.isBlockDevice()) type = 'Block device';
-  else type = 'unknown';
-  return type
 }
 
 async function ls() {
