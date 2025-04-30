@@ -4,6 +4,7 @@ import os from 'os'
 import { ERRORS } from "./errors.js"
 import fs from 'fs'
 import { table } from "console"
+import { pipeline } from "stream/promises"
 
 export const COMMANDS = {
   EXIT: '.exit',
@@ -39,8 +40,18 @@ function customOs() {
   console.log('command customOs')
 }
 
-function rm() {
-  console.log('command rm')
+async function rm(pathToFile) {
+  const targetPath = path.join(process.cwd(), pathToFile)
+  const isFile = await checkFile(targetPath)
+  if (!isFile) {
+    console.log(ERRORS.OPERATION_FAILED)
+    return
+  }
+  try {
+    await fs.promises.rm(targetPath)
+  } catch(e) {
+    console.log(ERRORS.OPERATION_FAILED)
+  }
 }
 
 const MIN_DIR_PATH = os.homedir()
@@ -64,6 +75,15 @@ async function checkFile(targetPath) {
   try {
     const stat = await fs.promises.stat(targetPath)
     return stat.isFile()
+  } catch(e) {
+    return false
+  }
+}
+
+async function checkTargetExist(targetPath) {
+  try {
+    await fs.promises.access(targetPath)
+    return true
   } catch(e) {
     return false
   }
@@ -122,24 +142,68 @@ async function ls() {
   }
 }
 
-function mkdir() {
-  console.log('cmd mkdir')
+async function mkdir(dirName) {
+  const targetPath = path.join(process.cwd(), dirName)
+  const dirExist = await isDirectory(targetPath)
+  if (dirExist) {
+    console.log(ERRORS.OPERATION_FAILED)
+    return
+  }
+  await fs.promises.mkdir(targetPath)
 }
 
-function add() {
-  console.log('command add')
+async function add(fileName) {
+  if (!fileName) {
+    throw new Error(ERRORS.OPERATION_FAILED)
+  }
+  const actualPath = path.join(process.cwd(), fileName)
+
+  const isFileExist = await checkTargetExist(actualPath)
+  if (isFileExist) {
+    throw new Error(ERRORS.OPERATION_FAILED)
+  }
+  await fs.promises.writeFile(actualPath, '')
 }
 
-function rn() {
-  console.log('command rn')
+async function rn(targetPath, newFileName) {
+  const expectedPath = path.join(process.cwd(), targetPath)
+  try {
+    await fs.promises.rename(expectedPath, newFileName)
+  } catch(e) {
+    console.log(ERRORS.OPERATION_FAILED)
+  }
+  
 }
 
 function cp() {
   console.log('cmd cp')
 }
 
-function mv() {
-  console.log('cmd mv')
+async function mv(fileName, newPath) {
+  const oldFilePath = path.join(process.cwd(), fileName)
+  const targetMovePath = path.join(process.cwd(), newPath)
+
+  const isFileExists = await checkFile(oldFilePath)
+  if (!isFileExists) {
+    console.log(ERRORS.OPERATION_FAILED)
+    return
+  }
+
+  const isDirTarget = await isDirectory(targetMovePath)
+  if (!isDirTarget) {
+    console.log(ERRORS.OPERATION_FAILED)
+    return
+  }
+
+  try {
+    const readStream = fs.createReadStream(oldFilePath)
+    const writeFilePath = path.join(targetMovePath, fileName)
+    const writeStream = fs.createWriteStream(writeFilePath)
+    await pipeline(readStream, writeStream)
+    await fs.promises.unlink(oldFilePath)
+  } catch(e) {
+    console.log(ERRORS.OPERATION_FAILED)
+  }
 }
 
 async function cat(targetPath) {

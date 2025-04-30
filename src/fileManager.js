@@ -33,7 +33,7 @@ export function fileManager() {
     if (!input) return ''
     const { command, args } = getCommandFromInput(input);
     if (command)
-      await command(...args)
+      await command(...args).catch(e => console.log(e))
     else
       console.log(ERRORS.INVALID_INPUT)
 
